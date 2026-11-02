@@ -1,0 +1,105 @@
+# 技术说明
+
+本文描述 0.5.1 的实际实现。主入口是 Electron 桌面；旧 Tk 界面代码仅为兼容和历史保留。
+
+## 进程与通信
+
+Electron 主进程创建窗口、打开系统文件选择器、启动 Python 服务，并校验 IPC 的发送者与操作名。preload 用 `contextBridge` 暴露窄接口，渲染端不能直接调用文件系统或执行进程。
+
+Python 使用 stdin / stdout 上的逐行 JSON（NDJSON）处理请求，通过 ID 对应返回结果。监控与流式文本通过事件返回。服务不启动本地 HTTP 监听端口。固定操作受白名单和串行操作锁约束。
+
+对应代码：[main.cjs](../desktop/main.cjs)、[preload.cjs](../desktop/preload.cjs)、[desktop_service.py](../bioagent/desktop_service.py)。
+
+## AI 的职责与权限
+
+研究问答使用 OpenAI Responses API 的文本流和函数调用。模型只能请求当前冻结资料包开放的工具：
+
+| 工具 | 范围 |
+| --- | --- |
+| `list_evidence` | 列出当前资料包的证据 |
+| `read_evidence` | 读取批准的片段 |
+| `search_evidence` | 在当前片段中词法检索 |
+| `table_summary` | 读取本地已计算的摘要 |
+| `plot_data` | 关联数据快照后，用受限图形和列生成基础图 |
+
+工具不接受磁盘路径或任意代码。调用轮数、工具次数和图表数量均有上限。AI 分析方案另外使用严格 JSON Schema 返回列角色与图形建议，本地再次校验列名、互斥角色和枚举，不能直接更改数据。
+
+API 固定为官方端点，Key 只保留在内存中。账户模型列表从实际连接加载，不预设模型权限。错误处理区分认证、模型、余额、用量和短期限速，只展示白名单字段。
+
+对应代码：[agent.py](../bioagent/agent.py)、[connection.py](../bioagent/connection.py)、[billing.py](../bioagent/billing.py)。
+
+## 文件读取与来源追踪
+
+`safety.py` 检查根目录、路径边界、重解析点和硬链接。Windows 使用只读句柄，验证最终路径与链接数。资料读取为内存快照，不写回原始内容。
+
+普通检索使用来源与片段编号，PDF 附件支持物理页编号。引用定位到回答绑定的快照；只能说明来源属于资料包，不能证明模型解释正确。
+
+导出记录包含来源名称、SHA-256、工作表、参数、逐条筛选原因和统计。输出目录不能与输入目录相互包含，文件采用排他新建。
+
+对应代码：[safety.py](../bioagent/safety.py)、[library.py](../bioagent/library.py)、[attachments.py](../bioagent/attachments.py)。
+
+## 表格与仪器格式
+
+CSV / TSV 使用标准库读取。XLSX 使用 openpyxl 的只读、缓存值模式，并禁用外部链接。不计算公式。压缩体积、条目数、行列数和最终记录数均有上限。
+
+Spark 适配需要明确软件标记与单个动力学表头，提取实际 `Time [s]` 并换算为分钟，保留信号、物理列、孔号、周期和源单元格。它校验周期数与时间轴，不使用设定间隔替代实际采样，也不自动推断浓度或实验独立性。
+
+对应代码：[tables.py](../bioagent/tables.py)、[plate.py](../bioagent/plate.py)、[analysis.py](../bioagent/analysis.py)。
+
+## 筛选与统计
+
+参数校验后生成不可变预览。出图必须使用该预览令牌。导入新数据、修改表单或重新预览会使旧的前端生成授权失效。
+
+缺失或无效的所选字段不能参与该图。数值范围与手动排除分别记录原因；手动排除必须说明。重复记录和 IQR 候选只标记，不自动剔除。
+
+指定重复时，同组、同时间点、同重复编号的技术测量先平均，再计算重复之间的均值与样本标准差：
+
+```text
+sample SD = sqrt(sum((value - mean)^2) / (n - 1))
+SEM = sample SD / sqrt(n)
+```
+
+`n < 2` 时误差缺失，不画成零误差。未指定重复编号时，`n` 仅表示记录数。生物学独立性需要由实验设计确认。
+
+## 孤立跳点候选
+
+每条组别 / 孔号曲线按实际时间排序，用左右相邻点计算线性参考值，得到当前点残差。以残差中位数为中心计算：
+
+```text
+MAD = median(abs(residual - median(residual)))
+scaled MAD = 1.4826 * MAD
+```
+
+候选同时满足残差超阈值、左右差分异号和两侧邻点恢复条件，跨大时间缺口不检查。默认阈值是探索性工程选择，不是经本项目实验验证的检测性能保证。
+
+该方法跳过首尾点、短序列、重复时间和 MAD 为零的曲线，可能漏掉连续异常或真实快速事件。它不要求时间或浓度单调上升，不补值、不平滑。候选只有在用户应用并预览后才影响图表。
+
+有手动排除时，同范围的排除前与排除后图一起保存。范围外数据的“不绘制”与异常剔除应分别解释。
+
+对应代码：[workflow.py](../bioagent/workflow.py)、[workflow.js](../desktop/workflow.js)。
+
+## 绘图与结果包
+
+Matplotlib 使用 Agg 生成 PNG，用 SVG 后端输出矢量图。字体设置含 Windows 中文回退，文本不按 LaTeX 执行。
+
+结果 ZIP 包含 `figure.png` / `figure.svg`、冻结参数与决策 `analysis.json`、逐条记录 `row_decisions.csv`、筛选后测量 `processed_points.csv`、图上统计 `summary.csv`。有手动排除时增加 `before_exclusion.*` 和 `before_summary.csv`。
+
+CSV 为可能解释成公式的字符串增加单引号，JSON 保留原文。SVG 文本仍依赖接收设备字体。当前没有显著性检验、自动平滑或曲线拟合。
+
+## 图片监控
+
+只监控用户选定目录的第一层。现有文件作为基线，新建或修改文件在连续两次轮询的大小与修改时间一致后提示。只读预览首帧，有大小与像素上限，不自动上传。稳定检测不能保证设备已完成全部写入。
+
+对应代码：[monitor.py](../bioagent/monitor.py)。
+
+## 构建与验证
+
+`tools/fetch_runtime.py` 下载并校验固定 Electron 版本；PyInstaller 打包 Python 服务、解析器与合成样例；`tools/package_desktop.py` 组装独立桌面目录。构建产物不提交到源码仓库。
+
+pytest 覆盖文件保护、解析限额、统计、预览失效、快照、导出一致性、孤立候选、模拟 API 和真实 stdio 子进程。Electron `--self-test` 用合成文件及离线响应检查界面桥接，不使用真实账户 Key。
+
+## 扩展约定
+
+新分析方法先实现确定性函数与校验，再加入服务白名单和界面预览。模型工具只引用批准的内存对象，不接收路径、脚本或任意 URL。仪器适配保留源坐标与时间单位，拒绝模糊或不完整格式，不静默截断。
+
+外部软件控制、会话持久化与更多统计方法尚未接入，不应通过无限制终端工具绕过现有权限设计。

@@ -1,0 +1,7 @@
+{
+  "name": "bme-workbench",
+  "version": "0.5.1",
+  "description": "Local BME research desktop with an isolated Chromium interface",
+  "main": "main.cjs",
+  "private": true
+}

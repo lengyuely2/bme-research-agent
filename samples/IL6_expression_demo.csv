@@ -1,0 +1,7 @@
+sample_id,group,IL6_expression,TNF_expression
+demo_a,control,1.0,0.9
+demo_b,control,1.2,1.1
+demo_c,control,0.8,1.0
+demo_d,stimulated,2.2,1.7
+demo_e,stimulated,2.6,2.0
+demo_f,stimulated,2.4,1.9

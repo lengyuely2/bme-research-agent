@@ -49,3 +49,9 @@ reports/
 !/samples/EMG_demo.csv
 !/samples/biosensor_demo.csv
 !/samples/kinetics_demo.csv
+
+# Reviewed desktop screenshots contain only synthetic demo content.
+!/docs/screenshots/research-home.png
+!/docs/screenshots/paper-preview.png
+!/docs/screenshots/analysis-workflow.png
+!/docs/screenshots/scientific-plot.png

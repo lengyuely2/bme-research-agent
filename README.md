@@ -10,6 +10,26 @@
 
 当前版本：**0.5.1**。采用 Electron 界面和 Python 本地分析服务。AI 理解研究问题并提出受限建议，数据筛选、计算与绘图由本地固定函数执行。
 
+### 界面预览
+
+以下为 v0.5.1 桌面程序的真实截图，当前界面以中文为主。论文和曲线均使用仓库内的合成演示数据，不包含真实实验资料或 API 密钥。
+
+**研究工作台**
+
+![BME Agent 深色研究工作台](docs/screenshots/research-home.png)
+
+**论文逐页预览**
+
+![合成论文的本地 PDF 逐页预览](docs/screenshots/paper-preview.png)
+
+**数据映射与筛选流程**
+
+![合成动力学数据的列映射和筛选设置](docs/screenshots/analysis-workflow.png)
+
+**科研绘图结果**
+
+![合成数据的三组时间曲线及均值与 SD 误差带](docs/screenshots/scientific-plot.png)
+
 ### 功能
 
 | 模块 | 当前实现 |
@@ -195,6 +215,26 @@ start.ps1 / start.bat   启动入口
 **A local research workbench for biosensing and disease-detection experiments.**
 
 Current version: **0.5.1**. The application combines an Electron desktop interface with a Python analysis service. AI interprets research questions and proposes bounded plans. Fixed local functions perform data filtering, calculations, and plotting.
+
+### Interface screenshots
+
+These are actual screenshots of the v0.5.1 desktop application, whose interface is currently primarily in Chinese. The paper and curves use the repository's synthetic demos; no real experimental material or API keys are shown.
+
+**Research workspace**
+
+![BME Agent dark research workspace](docs/screenshots/research-home.png)
+
+**Page-by-page paper preview**
+
+![Local PDF page preview of a synthetic paper](docs/screenshots/paper-preview.png)
+
+**Data mapping and filtering workflow**
+
+![Column mapping and filtering controls for synthetic kinetics data](docs/screenshots/analysis-workflow.png)
+
+**Scientific plotting results**
+
+![Three synthetic time courses with mean and SD bands](docs/screenshots/scientific-plot.png)
 
 ### Features
 

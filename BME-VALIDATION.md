@@ -68,27 +68,26 @@ Screenshots contain only this app and synthetic fixtures.
 - BME donor redistribution licensing is separately documented in `BME-NOTICE.md`.
   This fork was not pushed or published.
 
-## Version 0.1.1 — English interface and real-data walkthrough
+## Version 0.1.1 — English interface and real-data results
 
 The earlier native checks describe the original v0.1 synthetic-fixture session.
-For v0.1.1, visible BME labels, settings, errors, analysis notes, and exports are English.
-Chinese input aliases and multilingual chat remain supported. The English native home
-was visually checked. Desktop interaction was then stopped by the user's Escape key;
-no further UI automation was performed. This video is an edited analysis walkthrough.
+Visible BME labels, settings, errors, analysis notes, and exports are English.
+Chinese input aliases and multilingual chat remain supported. The English native
+home was visually checked. Subsequent real-data analysis ran through the fixed
+application engine in the background; these are exported results, not UI captures.
 
-The demo uses owner-provided real CLICK SA data. The original workbook stayed unchanged;
-all 3,200 prepared readings and 32 final-five-cycle endpoints were reconciled. The app's
-engine generated endpoint, kinetics, and four-well figures, with zero exclusions.
-PNG/SVG and full local audit ZIPs were produced; record-level bundles remain private.
-Units and biological independence are unconfirmed. The English video has an app home
-capture, actual scientific figures, explanation cards, offline narration, and WebVTT.
-It decoded successfully end-to-end (174.49 seconds, H.264/AAC).
+The example uses owner-provided real CLICK SA data. The original workbook remained
+unchanged; all 3,200 prepared readings and 32 final-five-cycle endpoints were
+reconciled. The app engine generated endpoint, full-kinetics, and four-well figures,
+with zero exclusions. PNG/SVG and full local audit ZIPs were produced; record-level
+bundles remain private. Units and biological independence are unconfirmed.
+The public example consists of three result plots and a method note.
 
 23 Python tests, 29 frontend tests, both TypeScript projects, changed-file ESLint,
 and the production build passed. Python compileall passed. One existing Starlette/httpx
 deprecation warning was observed. No live OpenAI key, billing query, model access,
 vision response, or real cloud tool reasoning was tested.
 
-The owner authorized public source publication and the reviewed real-data demo.
+The owner authorized public source publication and the reviewed real-data figures.
 This supersedes the earlier local-only status, without assigning a new BME license.
 See BME-NOTICE.md and docs/demo/REAL-DATA-METHOD.md.

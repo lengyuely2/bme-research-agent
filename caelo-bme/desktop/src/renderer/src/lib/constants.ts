@@ -1,0 +1,95 @@
+// Statyczne listy opcji mediów — odwzorowane z caelo_core/config.py.
+export const ASPECT_RATIOS = [
+  'auto', '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3',
+  '2:1', '1:2', '19.5:9', '9:19.5', '20:9', '9:20', '21:9', '5:2'
+]
+
+export const RESOLUTIONS = ['1k', '2k']
+
+// Liczba wariantów obrazu: API dopuszcza do 10 na żądanie.
+export const IMAGE_VARIANTS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+// Fallback listy modeli obrazu, gdy /models jeszcze nie odpowiedziało
+// (źródło prawdy: caelo_core/config.py -> IMAGE_MODELS). `grok-imagine-image-quality`
+// jest wycofany 2026-11-02 (backend przepisuje go na 2.0 + quality low).
+export const IMAGE_MODELS = [
+  'grok-imagine-image',
+  'grok-imagine-image-2.0'
+]
+
+// Parametr `quality` przyjmuje WYŁĄCZNIE grok-imagine-image-2.0 (docs.x.ai); inne
+// modele zwracają 4xx, więc backend go dla nich pomija, a UI nie pokazuje pola.
+export const IMAGE_QUALITY_LEVELS = ['low', 'medium', 'auto']
+export function imageModelSupportsQuality(model: string): boolean {
+  return model === 'grok-imagine-image-2.0'
+}
+
+// Maks. liczba obrazów referencyjnych w edycji (limit API).
+export const EDIT_MAX_IMAGES = 5
+
+// Pełny zbiór; 1080p obsługuje tylko model 1.5 (bazowy kończy się na 720p).
+// Źródło prawdy: caelo_core/config.py -> VIDEO_RESOLUTIONS(_BY_MODEL).
+export const VIDEO_RESOLUTIONS = ['480p', '720p', '1080p']
+
+// Rozdzielczości dostępne dla danego modelu wideo (rodzina 1.5 — także lite — ma 1080p).
+export function videoResolutionsFor(model: string): string[] {
+  return model.includes('1.5') ? ['480p', '720p', '1080p'] : ['480p', '720p']
+}
+
+// Reference-to-video: obrazy przenoszące postać/produkt/miejsce do klipu (BEZ blokowania
+// pierwszej klatki — to osobna rzecz niż „First frame"). 1.5: do 14, bazowy: do 7,
+// lite: brak. Źródło prawdy: config.py -> VIDEO_MAX_REFERENCE_IMAGES (UI czyta rejestr).
+export const VIDEO_MAX_REFERENCE_IMAGES_BY_MODEL: Record<string, number> = {
+  'grok-imagine-video-1.5': 14,
+  'grok-imagine-video': 7
+}
+export function videoMaxReferenceImages(model: string): number {
+  return VIDEO_MAX_REFERENCE_IMAGES_BY_MODEL[model] ?? 0
+}
+export function videoModelSupportsReferences(model: string): boolean {
+  return videoMaxReferenceImages(model) > 0
+}
+
+// 'Original' = nie wysyłaj aspect_ratio (zachowaj kadr źródłowy / domyślny API).
+export const VIDEO_RATIOS = ['Original', '16:9', '9:16', '1:1', '4:3', '3:4', '3:2', '2:3', '21:9', '5:2']
+
+// Czas trwania (suwak). Generacja: 1-15 s (domyślnie 8). Przedłużenie: 1-10 s (domyślnie 6).
+export const VIDEO_DURATION_MIN = 1
+export const VIDEO_DURATION_MAX = 15
+export const VIDEO_DURATION_DEFAULT = 8
+export const EXTEND_DURATION_MIN = 1
+export const EXTEND_DURATION_MAX = 10
+export const EXTEND_DURATION_DEFAULT = 6
+
+// --- Voice ---
+// Pięć wbudowanych głosów Grok (źródło prawdy: caelo_core/config.py -> VOICE_VOICES).
+export const VOICES = [
+  { id: 'eve', label: 'Eve · energetic' },
+  { id: 'ara', label: 'Ara · warm' },
+  { id: 'rex', label: 'Rex · confident' },
+  { id: 'sal', label: 'Sal · balanced' },
+  { id: 'leo', label: 'Leo · authoritative' }
+]
+export const DEFAULT_VOICE = 'eve'
+
+// M12-B5/F5: stawki kosztu audio — MIRROR caelo_core/config.py (BYO-key). STT batch
+// liczy backend z `duration`; STT-stream koszt liczy renderer z sekund mikrofonu.
+export const AUDIO_COST = {
+  sttPerHourBatch: 0.1,
+  sttPerHourStream: 0.2,
+  ttsPer1kChars: 0.015
+}
+
+export const VOICE_LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'pl', label: 'Polish' },
+  { code: 'es', label: 'Spanish' },
+  { code: 'fr', label: 'French' },
+  { code: 'de', label: 'German' },
+  { code: 'it', label: 'Italian' },
+  { code: 'pt', label: 'Portuguese' },
+  { code: 'ru', label: 'Russian' },
+  { code: 'ja', label: 'Japanese' },
+  { code: 'zh', label: 'Chinese' },
+  { code: 'ko', label: 'Korean' }
+]

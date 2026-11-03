@@ -1,0 +1,9 @@
+# Caelo BME provenance and licensing
+
+- **Desktop host:** [AuraVixStudio/caelo](https://github.com/AuraVixStudio/caelo), revision `5de4a43b94692c0122b135bd61b0f458ddd16971` (Caelo 2.0.12), Apache-2.0. The upstream `LICENSE`, attribution, and notices are preserved. `README-UPSTREAM.md` describes upstream features, some disabled in this fork.
+- **BME donor:** the owner's BME Research Agent v0.5.1, revision `0db02e8428c856ea3a67d26e061f979317705277`, through its local GPT/Grok integration. Donated files include `caelo_core/bme/engine/{analysis,library,monitor,plate,safety,tables,workflow}.py`, synthetic `caelo_core/bme/samples/*`, and the workspace dispatcher adapted from the donor's `mcp_server.py`.
+- **Fork changes:** restricted BME dispatch; English React workbench; OpenAI configuration and model lookup; OS-encrypted credentials; manual balance; path boundaries; approval for model-generated exports; safe previews; restartable monitoring; persisted research sessions; and an English real-experiment walkthrough.
+- The owner requested public GitHub publication. The BME donor has **no explicit reuse license** in the inspected source. Publication does not assign a new license or imply that Apache-2.0 automatically covers BME donor files. Those portions are source-available with no additional reuse license granted here. Obtain permission from their owner for reuse beyond applicable law.
+- Real experimental source files and record-level audit bundles are excluded. Only owner-authorized derived demo figures and reviewed media are published; see `docs/demo/REAL-DATA-METHOD.md`.
+
+This is an independent **Caelo-based** project, not the official Grok web interface or an xAI model release. It does not require the Grok terminal or login. Upstream and third-party components retain their respective licenses and attribution.

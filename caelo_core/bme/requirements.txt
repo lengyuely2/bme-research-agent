@@ -1,0 +1,6 @@
+matplotlib>=3.9,<4
+pypdf>=6,<7
+pillow>=11,<13
+openpyxl>=3.1,<4
+defusedxml>=0.7,<1
+pypdfium2>=4,<6

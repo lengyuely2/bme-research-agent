@@ -1,0 +1,98 @@
+appId: com.caelo.desktop
+productName: Caelo 2.0
+copyright: Copyright © 2026 Caelo contributors
+
+directories:
+  buildResources: build      # opcjonalna ikona: desktop/build/icon.ico (inaczej domyślna Electron)
+  output: dist               # instalator ląduje w desktop/dist (gitignored)
+
+# Co trafia do paczki aplikacji (asar). Sidecar idzie osobno przez extraResources.
+files:
+  - out/**
+  - package.json
+  - '!**/*.map'
+
+# Spakowany sidecar PyInstaller (zbuduj wcześniej: build_sidecar.ps1 -> ../dist/caelo-core).
+# Trafia do resources/caelo-core, skąd uruchamia go proces główny (app.isPackaged).
+extraResources:
+  - from: ../dist/caelo-core
+    to: caelo-core
+
+asar: true
+
+# M15-8: feed auto-aktualizacji = GitHub Releases. electron-builder generuje z tej
+# sekcji `app-update.yml` (w paczce) oraz `latest.yml` (w wydaniu), a electron-updater
+# w procesie głównym czyta z nich nową wersję. Owner/repo są wnioskowane z pola
+# `repository` w package.json lub z remote'a gita — USTAW je po utworzeniu repo
+# (albo odkomentuj i wpisz poniżej). Publikacja dzieje się tylko z flagą `--publish`.
+publish:
+  - provider: github
+    owner: AuraVixStudio
+    repo: caelo
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  # --- Podpisywanie Authenticode: cert CHMUROWY Asseco SimplySign (Faza B / runbook Krok 6.3) ---
+  # Klucz jest NIEEKSPORTOWALNY (autoryzacja przez aplikację mobilną), więc NIE używamy
+  # CSC_LINK/.pfx ani podpisu w CI — electron-builder woła `signtool` po cert ze SKLEPU
+  # certyfikatów Windows (wirtualna karta SimplySign Desktop). Podpis robimy LOKALNIE
+  # (`npm run dist:full` na maszynie usera z aktywnym SimplySign Desktop).
+  # Cert: CN=AuraVix Studio Marcin Stelmach (SimplySign), ważny do 2027-03-04.
+  signtoolOptions:
+    certificateSha1: "B6DB11F7A2C94188FA369685A62D5DFBD4393C67"
+    rfc3161TimeStampServer: http://time.certum.pl   # znacznik czasu Certum (podpis przeżyje wygaśnięcie certu)
+    signingHashAlgorithms: [sha256]
+  # Sidecar `caelo-core.exe` (extraResources) NIE jest objęty podpisem instalatora — podpisz go
+  # OSOBNO przy budowie: ustaw $env:CAELO_SIGN_THUMBPRINT przed `build_sidecar.ps1` (patrz skrypt).
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: Caelo-Setup-${version}.${ext}
+  shortcutName: Caelo 2.0
+  uninstallDisplayName: Caelo 2.0
+
+# M15-9 (warunkowe): cele mac/Linux — SKONFIGUROWANE, budowane NA ŻĄDANIE na runnerze
+# per-OS (cross-compile sidecara PyInstaller jest niepraktyczny). Sidecar
+# (../dist/caelo-core) musi być zbudowany na DOCELOWYM OS (build_sidecar.sh) PRZED
+# electron-builderem. extraResources/main proces są OS-agnostyczne (caelo-core vs .exe).
+mac:
+  # NIE zaszywaj tu `arch: [x64, arm64]` — to nadpisuje flagę CLI, przez co KAŻDY runner
+  # budował OBIE architektury. Sidecar PyInstaller jest natywny dla runnera (arm64 na
+  # macos-14, x64 na macos-13), więc skrzyżowany .dmg dostawał sidecar niewłaściwej arch
+  # (zepsuty). Architekturę wybiera flaga CLI per-runner w release.yml (`--mac --arm64` /
+  # `--mac --x64`); lokalny build też podaj flagę arch (inaczej zbuduje tylko arch hosta).
+  target:
+    - target: dmg
+  category: public.app-category.developer-tools
+  # --- Podpis Developer ID + notaryzacja (Gatekeeper) ---
+  # Hardened Runtime + entitlements są WYMAGANE do notaryzacji. entitlementsInherit
+  # stosuje się do zagnieżdżonych binariów — w tym sidecara PyInstaller (caelo-core +
+  # _internal/*.dylib): Python potrzebuje allow-jit / allow-unsigned-executable-memory /
+  # disable-library-validation, inaczej notaryzacja odrzuci pakiet.
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # Cert (CSC_LINK/CSC_KEY_PASSWORD) + dane notaryzacji (APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD/
+  # APPLE_TEAM_ID) electron-builder czyta z ENV (ustawiane z sekretów w release.yml).
+  # Notaryzacja NIE jest tu włączona na sztywno — workflow dokłada `-c.mac.notarize=true`
+  # TYLKO gdy cert jest obecny, więc build bez sekretów daje czysty NIEPODPISANY .dmg.
+
+linux:
+  target:
+    - target: AppImage
+    - target: deb
+  category: Development
+  maintainer: Caelo contributors
+  synopsis: Desktop AI studio for xAI Grok and Google Gemini / Vertex AI
+
+dmg:
+  artifactName: Caelo-${version}-${arch}.${ext}
+
+appImage:
+  artifactName: Caelo-${version}.${ext}

@@ -1,0 +1,157 @@
+name: Release
+
+# M15-9: budowa instalatorów per-OS na runnerze danego systemu (cross-compile
+# sidecara PyInstaller jest niepraktyczny — każdy OS buduje swój własny sidecar).
+# Wyzwalane TAGIEM `v*` (np. v1.2.0) lub ręcznie.
+#
+# PUBLIKACJA (zależna od wyzwalacza):
+#  • push TAGU `v*`  → mac/Linux robią `--publish always`: electron-builder wgrywa binaria
+#    ORAZ feedy auto-update `latest-mac.yml`/`latest-linux.yml` (SHA512 pod dany build) do
+#    Release'u o tym tagu (tworzy draft, jeśli nie istnieje). Repo jest publiczne, więc
+#    electron-updater pobierze te feedy u end-userów.
+#  • workflow_dispatch (test) → `--publish never` + upload-artifact (nic nie ląduje w Release).
+# Windows NIE jest w matrycy: podpis Authenticode używa CHMUROWEGO certu SimplySign, który
+# istnieje wyłącznie lokalnie u utrzymującego (SimplySign Desktop). Podpisany `.exe` + jego
+# `latest.yml` user buduje i publikuje LOKALNIE (`npm run dist:full` + `gh release upload`
+# / `electron-builder --publish always`) do TEGO SAMEGO Release'u — assety per-OS się sumują.
+#
+# mac/Linux budują się na osobnych runnerach — fail-fast: false, więc problem na jednym OS
+# nie blokuje pozostałych.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write          # buildy z tagu publikują binaria + feedy mac/Linux do Release (Windows publikuje user lokalnie)
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }} ${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      # Każdy wpis = osobny runner danego OS/architektury. Sidecar PyInstaller jest
+      # natywny dla architektury runnera (cross-compile niepraktyczny), więc x64/arm64
+      # Maca budują się na ODDZIELNYCH runnerach: macos-13 (Intel/x64) + macos-14
+      # (Apple Silicon/arm64). `ebuild` mówi electron-builderowi, którą platformę+arch
+      # spakować (flagi CLI nadpisują arch z electron-builder.yml).
+      # Windows NIE buduje się tutaj: podpis Authenticode używa certu CHMUROWEGO
+      # SimplySign, który istnieje WYŁĄCZNIE lokalnie na maszynie utrzymującego
+      # (SimplySign Desktop, karta wirtualna) — runner GitHuba go nie ma, więc
+      # podpis padał. Podpisany .exe Windows powstaje lokalnie (`npm run dist:full`).
+      # CI waliduje tylko cele cross-OS, których NIE da się zbudować lokalnie na Windows.
+      # macOS (Intel macos-13 + Apple Silicon macos-14) buduje się TU: bez sekretów
+      # MAC_CSC_LINK/… daje czysty NIEPODPISANY .dmg (build zielony), a po dodaniu certu
+      # Developer ID (.p12 → MAC_CSC_LINK/MAC_CSC_KEY_PASSWORD) + danych notaryzacji
+      # (APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD/APPLE_TEAM_ID) krok budowy dokłada
+      # `-c.mac.notarize=true` → podpis + notaryzacja Gatekeeper. Konfiguracja mac:
+      # (electron-builder.yml), entitlements i logika podpisu są na miejscu.
+      #
+      # macOS = ARM64-ONLY (Apple Silicon). Intelowy runner `macos-13` GitHub WYGASZA —
+      # kolejka potrafi nie ruszyć godzinami (2026-07-03: job wisiał 10h i nie wystartował),
+      # więc go NIE trzymamy (blokowałby każde wydanie). x64 na macos-14 wymagałby budowy
+      # sidecara PyInstaller pod Rosettą (`arch -x86_64`) — nie da się tego zweryfikować bez
+      # Intelowego Maca. Odłożone jako osobne zadanie (docs/plans/PLAN_OTWARTE.md).
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x64
+            sidecar: bash build_sidecar.sh
+            ebuild: --linux --x64
+          - os: macos-14          # Apple Silicon (arm64) — jedyny wspierany target macOS
+            arch: arm64
+            sidecar: bash build_sidecar.sh
+            ebuild: --mac --arm64
+    runs-on: ${{ matrix.os }}
+    env:
+      PYTHONUTF8: "1"
+      # Podpis + notaryzacja macOS (Developer ID). electron-builder czyta te zmienne
+      # automatycznie: CSC_LINK/CSC_KEY_PASSWORD = cert .p12 (base64), APPLE_* = notaryzacja.
+      # Gdy sekrety NIE są ustawione, renderują się jako pusty string → electron-builder
+      # POMIJA podpis i buduje NIEPODPISANY .dmg (build pozostaje zielony). Notaryzacja
+      # uruchamia się dopiero, gdy aplikacja została podpisana. Na Linuksie ignorowane.
+      CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Build sidecar (PyInstaller, per-OS)
+        run: ${{ matrix.sidecar }}
+
+      - name: Install frontend dependencies
+        working-directory: desktop
+        run: npm ci
+
+      # electron-updater jest zależnością runtime auto-update (M15-8) — domyślnie nie ma
+      # jej jeszcze w package.json (patrz M15-8), więc dociągamy ją do builda.
+      - name: Ensure electron-updater present
+        working-directory: desktop
+        run: npm ls electron-updater || npm install electron-updater
+
+      # electron-builder pakuje GOTOWY build (out/main, out/preload, out/renderer);
+      # bez tego kroku `out/main/index.js` nie istnieje i pakowanie pada
+      # ("Application entry file ... does not exist"). Skrypty dist:* w package.json
+      # robią to przez `npm run build &&`, ale tu wołamy binarkę wprost — więc budujemy jawnie.
+      - name: Build frontend (electron-vite)
+        working-directory: desktop
+        run: npm run build
+
+      # `matrix.ebuild` = platforma+arch (np. `--mac --arm64`); flagi CLI nadpisują arch z konfiga.
+      #
+      # Publikacja: TAG → `--publish always` (binaria + feed latest-*.yml do Release), dispatch →
+      # `--publish never` (tylko artefakty, patrz nagłówek). electron-builder czyta GH_TOKEN.
+      #
+      # Podpis macOS jest OPCJONALNY i sterowany obecnością sekretu MAC_CSC_LINK:
+      #  • brak certu → USUWAMY puste zmienne podpisu (inaczej electron-builder bierze pusty
+      #    CSC_LINK za ścieżkę certu i pada „... not a file") → czysty NIEPODPISANY .dmg;
+      #  • cert obecny → dokładamy `-c.mac.notarize=true` → podpis Developer ID + notaryzacja.
+      - name: Build installer (signs + notarizes macOS only if MAC_CSC_LINK secret is set)
+        working-directory: desktop
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # electron-builder GitHub publisher (tylko przy --publish always)
+        run: |
+          PUBLISH="never"
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "Tag build → publishing binaries + auto-update feed to the Release."
+            PUBLISH="always"
+          fi
+          EXTRA=""
+          if [ -n "$CSC_LINK" ]; then
+            echo "Signing certificate present → enabling notarization."
+            EXTRA="-c.mac.notarize=true"
+          else
+            echo "No signing certificate → building UNSIGNED (dropping empty signing vars)."
+            unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
+          fi
+          npx --no-install electron-builder ${{ matrix.ebuild }} $EXTRA --publish "$PUBLISH"
+
+      # Kopia artefaktów do wglądu/diagnostyki (dispatch NIE publikuje do Release). Łapiemy też
+      # feedy latest-*.yml, by dało się je podejrzeć/dograć ręcznie. Tag i tak publikuje wprost.
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: caelo-build-${{ matrix.os }}
+          path: |
+            desktop/dist/*.exe
+            desktop/dist/*.dmg
+            desktop/dist/*.AppImage
+            desktop/dist/*.deb
+            desktop/dist/latest*.yml
+          if-no-files-found: ignore
+          retention-days: 7

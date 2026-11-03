@@ -11,6 +11,6 @@ The legacy v0.5.1 implementation remains at the repository root. Its original co
 tests and sample fixtures are retained. The new interface and runtime have their own
 entry point, dependencies and checks inside `caelo-bme/`.
 
-The owner authorized the real-experiment demonstration. Raw source workbooks,
+The owner authorized the real-experiment result figures. Raw source workbooks,
 prepared tables, private profiles and record-level export bundles are excluded.
 See [`REAL-DATA-METHOD.md`](caelo-bme/docs/demo/REAL-DATA-METHOD.md).

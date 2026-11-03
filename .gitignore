@@ -55,3 +55,7 @@ reports/
 !/docs/screenshots/paper-preview.png
 !/docs/screenshots/analysis-workflow.png
 !/docs/screenshots/scientific-plot.png
+
+# Reviewed real-data demo figures are tracked under caelo-bme/assets/screenshots/bme/en/real/.
+# Original workbooks, prepared tables, profiles and audit bundles remain private.
+*.wav

@@ -1,0 +1,53 @@
+name: Caelo BME focused checks
+
+on:
+  push:
+    branches: [main]
+    paths: ['caelo-bme/**', '.github/workflows/caelo-bme.yml']
+  pull_request:
+    paths: ['caelo-bme/**', '.github/workflows/caelo-bme.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focused:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: caelo-bme
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: caelo-bme/desktop/package-lock.json
+      - name: Install backend and test dependencies
+        run: python -m pip install -r caelo_core/requirements.txt -r caelo_core/bme/requirements.txt pytest httpx httpx2
+      - name: Focused backend checks
+        run: python -m pytest tests_bme caelo_core/tests/test_openai_phase3_agent.py caelo_core/tests/test_openai_api_errors.py -q
+      - name: Compile Python integration
+        run: python -m compileall -q caelo_core/bme
+      - name: Install frontend without installer hooks
+        working-directory: caelo-bme/desktop
+        run: npm ci --ignore-scripts
+      - name: Focused frontend checks
+        working-directory: caelo-bme/desktop
+        run: npx vitest run test/bmeView.test.tsx test/agentClient.test.ts test/agentSession.test.ts test/secrets.test.ts test/coreRequest.test.ts
+      - name: Typecheck
+        working-directory: caelo-bme/desktop
+        run: |
+          npm run typecheck:web
+          npm run typecheck:node
+      - name: Lint changed workbench surfaces
+        working-directory: caelo-bme/desktop
+        run: npx eslint src/renderer/src/App.tsx src/renderer/src/components/BMEView.tsx src/renderer/src/components/BMEBalance.tsx src/renderer/src/components/Markdown.tsx src/main/index.ts
+      - name: Production build
+        working-directory: caelo-bme/desktop
+        run: npm run build
